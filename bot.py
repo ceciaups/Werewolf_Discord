@@ -48,8 +48,9 @@ async def _test(ctx: commands.Context):
   indexes = []
   wgc = [4, 4, 4]
   set_wolf = []
-  wolves = ['小狼', '白狼王', '黑狼王', '狼美人', '石像鬼', '機械狼', '夢魘', '血月使徒', '惡靈騎士', '隱狼/雪狼', '狼兄', '狼弟']
-  set_god = []
+  wolves = ['小狼', '白狼王', '黑狼王', '狼美人', '機械狼', '石像鬼', '夢魘', '血月使徒', '惡靈騎士', '隱狼/雪狼', '狼兄', '狼弟']
+  set_good = []
+  goods = ['平民', '預言家', '女巫', '獵人', '白痴', '騎士', '通靈師', '守衛', '守墓人', '攝夢人', '獵魔人', '魔術師', '黑市商人']
   for i, member in enumerate(members):
     if ((member.bot == True) or (member.id == ADMIN_ID)):
       indexes.append(i)
@@ -57,6 +58,7 @@ async def _test(ctx: commands.Context):
     members.pop(index)
   
   # test function
+  
 
   pass
 
@@ -67,9 +69,9 @@ async def _start(ctx: commands.Context):
   # ------------------------------- General Variables -------------------------------
   wgc = []
   set_wolf = []
-  wolves = ['小狼', '白狼王', '黑狼王', '狼美人', '石像鬼', '機械狼', '夢魘', '血月使徒', '惡靈騎士', '隱狼/雪狼', '狼兄', '狼弟']
-  set_god = []
-  gods = []
+  wolves = ['小狼', '白狼王', '黑狼王', '狼美人', '機械狼', '石像鬼', '夢魘', '血月使徒', '惡靈騎士', '隱狼/雪狼', '狼兄', '狼弟']
+  set_good = []
+  goods = ['平民', '預言家', '女巫', '獵人', '白痴', '騎士', '通靈師', '守衛', '守墓人', '攝夢人', '獵魔人', '魔術師', '黑市商人']
 
   # -------------------------- CONFIGURE THE GAME: PLAYERS --------------------------
   members = ctx.channel.members
@@ -85,7 +87,7 @@ async def _start(ctx: commands.Context):
   msg = await bot.wait_for('message')
   if (msg.content.lower() in ('no', 'n', 'false', 'f', '0', 'disable', 'off')):
     await ctx.send('唔夠玩家！')
-    pass
+    return
   else:
     # assign numbers to players
     await ctx.send('洗唔洗隨機分配號？ (y/n)')
@@ -115,18 +117,17 @@ async def _start(ctx: commands.Context):
   while (not msg) or (msg.content.lower() in ('no', 'n', 'false', 'f', '0', 'disable', 'off')):
     check_msg = ""
     set_wolf = []
-    await ctx.send('請選擇狼嘅配置（輸入對應數字 0-10）：\n╔═══╦═══════════════════╗\n║    0   ║                 其他全部小狼                 ║\n╠═══╬═══════╦═══╦═══════╣\n║    1    ║    白狼王     ║    6   ║       夢魘       ║\n╠═══╬═══════╬═══╬═══════╣\n║    2   ║    黑狼王     ║    7    ║  血月使徒  ║\n╠═══╬═══════╬═══╬═══════╣\n║    3   ║    狼美人     ║    8   ║   惡靈騎士  ║\n╠═══╬═══════╬═══╬═══════╣\n║    4   ║    石像鬼     ║    9   ║  隱狼/雪狼 ║\n╠═══╬═══════╬═══╬═══════╣\n║    5   ║    機械狼     ║   10  ║     狼兄弟    ║\n╚═══╩═══════╩═══╩═══════╝')
+    await ctx.send('請選擇狼嘅配置（輸入對應數字 0-10）：\n╔═══╦═══════════════════╗\n║    0   ║                 其他全部小狼                 ║\n╠═══╬═══════╦═══╦═══════╣\n║    1    ║    白狼王     ║    6   ║       夢魘       ║\n╠═══╬═══════╬═══╬═══════╣\n║    2   ║    黑狼王     ║    7    ║  血月使徒  ║\n╠═══╬═══════╬═══╬═══════╣\n║    3   ║    狼美人     ║    8   ║   惡靈騎士  ║\n╠═══╬═══════╬═══╬═══════╣\n║    4   ║    機械狼     ║    9   ║  隱狼/雪狼 ║\n╠═══╬═══════╬═══╬═══════╣\n║    5   ║    石像鬼     ║   10  ║     狼兄弟    ║\n╚═══╩═══════╩═══╩═══════╝')
     while (len(set_wolf) < wgc[0]):
       msg = await bot.wait_for('message')
       msg = int(re.search(r'\d+', msg.content).group())
-      print(f'{msg}')
-      if (msg > 10):
-        await ctx.send('請輸入啱嘅數字！（0-10）')
-      elif (msg == 0):
+      if (msg >= len(wolves)) or (msg < 0):
+        await ctx.send(f'請輸入啱嘅數字！（0-{len(wolves)-1}）')
+      elif (msg == wolves.index('小狼')):
         check_msg += str(wgc[0] - len(set_wolf)) + wolves[msg]
         for i in range(wgc[0] - len(set_wolf)):
           set_wolf.append(msg)
-      elif (msg == 10):
+      elif (msg == wolves.index('狼兄')):
         if (wgc[0] - len(set_wolf) > 1):
           set_wolf.append(msg)
           set_wolf.append(msg+1)
@@ -138,7 +139,30 @@ async def _start(ctx: commands.Context):
         set_wolf.append(msg)
         check_msg += '1' + wolves[msg]
         await ctx.send(f'加咗{wolves[msg]}')
-    await ctx.send(f'{check_msg}, 確認？（y/n）')
+    await ctx.send(f'{check_msg}，確認？（y/n）')
+    msg = await bot.wait_for('message')
+  # get type of gods
+  msg = None
+  while (not msg) or (msg.content.lower() in ('no', 'n', 'false', 'f', '0', 'disable', 'off')):
+    check_msg = ""
+    set_good = []
+    await ctx.send('請選擇神嘅配置（輸入對應數字 1-13）：\n╔═══╦═══════╦═══╦═══════╗\n║    1    ║    預言家     ║    7    ║       守衛      ║\n╠═══╬═══════╬═══╬═══════╣\n║    2   ║       女巫       ║   8    ║     守墓人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    3   ║       獵人       ║   9    ║     攝夢人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    4   ║       白痴       ║  10   ║     獵魔人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    5   ║       騎士       ║   11   ║     魔術師    ║\n╠═══╬═══════╬═══╬═══════╣\n║    6   ║     通靈師    ║   12   ║  黑市商人  ║\n╚═══╩═══════╩═══╩═══════╝')
+    while (len(set_good) < wgc[1]):
+      msg = await bot.wait_for('message')
+      msg = int(re.search(r'\d+', msg.content).group())
+      if (msg >= len(goods)) or (msg < 1):
+        await ctx.send(f'請輸入啱嘅數字！（1-{len(goods)-1}）')
+      else:
+        set_good.append(msg)
+        await ctx.send(f'加咗{goods[msg]}')
+        if (msg < 8):
+          check_msg += goods[msg][0]
+        else:
+          check_msg += goods[msg]
+    check_msg += str(wgc[2]) + goods[0]
+    for i in range(wgc[2]):
+      set_good.append(0)
+    await ctx.send(f'{check_msg}，確認？（y/n）')
     msg = await bot.wait_for('message')
 
   #   channel = client.get_channel(CHANNEL)
