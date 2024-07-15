@@ -2,6 +2,7 @@ import os
 
 import random
 import re
+import asyncio
 
 import discord
 from dotenv import load_dotenv
@@ -25,9 +26,11 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 #     self.number = number
 #     self.players = players
 
-class Player(discord.Member):
-  def __init__(self, role):
+class Player():
+  def __init__(self, member, role, alive=True):
+    self.member = member
     self.role = role
+    self.alive = alive
 
 # global settings variables
 # roles = ""
@@ -46,12 +49,15 @@ async def on_ready():
 async def _test(ctx: commands.Context):
   members = ctx.channel.members
   indexes = []
-  wgc = []
+  wgc = [4,4,4]
   set_wolf = ['白狼王', '小狼', '小狼', '小狼']
   wolves = ['小狼', '白狼王', '黑狼王', '狼美人', '機械狼', '石像鬼', '夢魘', '血月使徒', '惡靈騎士', '隱狼/雪狼', '狼兄', '狼弟']
   set_good = ['預言家', '女巫', '獵人', '白痴', '平民', '平民', '平民', '平民']
   goods = ['平民', '預言家', '女巫', '獵人', '白痴', '騎士', '通靈師', '守衛', '守墓人', '攝夢人', '獵魔人', '魔術師', '黑市商人']
   set_all = []
+  police = False
+  speaktime = 0
+  day = 0
   for i, member in enumerate(members):
     if ((member.bot == True) or (member.id == ADMIN_ID)):
       indexes.append(i)
@@ -59,7 +65,8 @@ async def _test(ctx: commands.Context):
     members.pop(index)
   
   # test function
-  # --------------------------- CONFIGURE THE GAME: ROLES ---------------------------
+  # ---------------------------------- STARTING THE GAME ----------------------------
+  
 
   pass
 
@@ -73,6 +80,10 @@ async def _start(ctx: commands.Context):
   wolves = ['小狼', '白狼王', '黑狼王', '狼美人', '機械狼', '石像鬼', '夢魘', '血月使徒', '惡靈騎士', '隱狼/雪狼', '狼兄', '狼弟']
   set_good = []
   goods = ['平民', '預言家', '女巫', '獵人', '白痴', '騎士', '通靈師', '守衛', '守墓人', '攝夢人', '獵魔人', '魔術師', '黑市商人']
+  police = False
+  speaktime = 0
+  day = 1
+  kill = []
 
   # -------------------------- CONFIGURE THE GAME: PLAYERS --------------------------
   members = ctx.channel.members
@@ -84,10 +95,10 @@ async def _start(ctx: commands.Context):
   for index in reversed(indexes):
     members.pop(index)
   # get number of players
-  ans = await checkYorN(ctx, f'係咪開{len(members)}人局？（y/n）')
+  ans = await getYorN(ctx, f'係咪開{len(members)}人局？（y/n）')
   if (ans):
     # assign numbers to players
-    ans = await checkYorN(ctx, '洗唔洗隨機分配號？（y/n）')
+    ans = await getYorN(ctx, '洗唔洗隨機分配號？（y/n）')
     if (ans):
       random.shuffle(members)
       for i in range(1, len(members)+1):
@@ -95,29 +106,31 @@ async def _start(ctx: commands.Context):
     else:
       await ctx.send('請各位玩家依序回應')
       for i in range(1, len(members)+1):
-        await ctx.send(f'{i}號玩家')
-        msg = await bot.wait_for('message')
-        index = members.index(msg.author)
+        index = await getMember(ctx, f'{i}號玩家')
+        index = members.index(index)
         await members[index].edit(nick=i)
   else:
     await ctx.send('唔夠玩家！')
     return
   
-  # -------------------------- CONFIGURE THE GAME: SETTINGS --------------------------
+  # --------------------------- CONFIGURE THE GAME: ROLES ---------------------------
   # wolves settings
   msg = None
-  while (not msg) or (not ans):
+  while (msg == None) or (not ans):
     # get number of wolves
-    wgc.append(await checkNumber(ctx, f'幾狼？（1-{int(len(members)/2)}）', 1, 1, int(len(members)/2)))
+    wgc.append(await getNumber(ctx, f'幾狼？（1-{int(len(members)/2)}）', 1, 1, int(len(members)/2+1)))
     # get type of wolves
     check_msg = ""
     set_wolf = []
     while (len(set_wolf) < wgc[0]):
-      msg = await checkNumber(ctx, '請選擇狼嘅配置（輸入對應數字 0-10）：\n╔═══╦═══════════════════╗\n║    0   ║                 其他全部小狼                 ║\n╠═══╬═══════╦═══╦═══════╣\n║    1    ║    白狼王     ║    6   ║       夢魘       ║\n╠═══╬═══════╬═══╬═══════╣\n║    2   ║    黑狼王     ║    7    ║  血月使徒  ║\n╠═══╬═══════╬═══╬═══════╣\n║    3   ║    狼美人     ║    8   ║   惡靈騎士  ║\n╠═══╬═══════╬═══╬═══════╣\n║    4   ║    機械狼     ║    9   ║  隱狼/雪狼 ║\n╠═══╬═══════╬═══╬═══════╣\n║    5   ║    石像鬼     ║   10  ║     狼兄弟    ║\n╚═══╩═══════╩═══╩═══════╝', 1, 0, len(wolves)-1)
-      if (msg == wolves.index('小狼')):
+      msg = await getNumber(ctx, f'請選擇狼嘅配置（輸入對應數字 0-{len(wolves)-2}）：\n╔═══╦═══════════════════╗\n║    0   ║                 其他全部小狼                 ║\n╠═══╬═══════╦═══╦═══════╣\n║    1    ║    白狼王     ║    6   ║       夢魘       ║\n╠═══╬═══════╬═══╬═══════╣\n║    2   ║    黑狼王     ║    7    ║  血月使徒  ║\n╠═══╬═══════╬═══╬═══════╣\n║    3   ║    狼美人     ║    8   ║   惡靈騎士  ║\n╠═══╬═══════╬═══╬═══════╣\n║    4   ║    機械狼     ║    9   ║  隱狼/雪狼 ║\n╠═══╬═══════╬═══╬═══════╣\n║    5   ║    石像鬼     ║   10  ║     狼兄弟    ║\n╚═══╩═══════╩═══╩═══════╝', 1, 0, len(wolves)-1)
+      if (wolves[msg] in set_wolf):
+        await ctx.send(f'已經有{wolves[msg]}！')
+      elif (msg == wolves.index('小狼')):
         check_msg += str(wgc[0] - len(set_wolf)) + wolves[msg]
         for i in range(wgc[0] - len(set_wolf)):
           set_wolf.append(msg)
+        await ctx.send(f'加咗{wolves[0]}')
       elif (msg == wolves.index('狼兄')):
         if (wgc[0] - len(set_wolf) > 1):
           set_wolf.append(msg)
@@ -128,30 +141,39 @@ async def _start(ctx: commands.Context):
           await ctx.send(f'唔夠兩隻狼，加唔到！')
       else:
         set_wolf.append(msg)
-        check_msg += '1' + wolves[msg]
+        check_msg += wolves[msg]
         await ctx.send(f'加咗{wolves[msg]}')
-    ans = await checkYorN(ctx, f'{check_msg}，確認？（y/n）')
+    ans = await getYorN(ctx, f'{check_msg}，確認？（y/n）')
   # gods settings
   msg = None
   while (not msg) or (not ans):
     # get number of gods and citizen
-    wgc.append(await checkNumber(ctx, f'幾神？（1-{len(members)-wgc[0]}）', 1, 1, len(members)-wgc[0]))
+    wgc.append(await getNumber(ctx, f'幾神？（1-{len(members)-wgc[0]}）', 1, 1, len(members)-wgc[0]+1))
     wgc.append(len(members) - sum(wgc))
     # get type of gods
     check_msg = ""
     set_good = []
     while (len(set_good) < wgc[1]):
-      msg = await checkNumber(ctx, '請選擇神嘅配置（輸入對應數字 1-13）：\n╔═══╦═══════╦═══╦═══════╗\n║    1    ║    預言家     ║    7    ║       守衛      ║\n╠═══╬═══════╬═══╬═══════╣\n║    2   ║       女巫       ║   8    ║     守墓人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    3   ║       獵人       ║   9    ║     攝夢人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    4   ║       白痴       ║  10   ║     獵魔人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    5   ║       騎士       ║   11   ║     魔術師    ║\n╠═══╬═══════╬═══╬═══════╣\n║    6   ║     通靈師    ║   12   ║  黑市商人  ║\n╚═══╩═══════╩═══╩═══════╝', 1, 1, len(goods))
-      set_good.append(msg)
-      await ctx.send(f'加咗{goods[msg]}')
-      if (msg < 8):
-        check_msg += goods[msg][0]
+      msg = await getNumber(ctx, f'請選擇神嘅配置（輸入對應數字 1-{len(goods)-1}）：\n╔═══╦═══════╦═══╦═══════╗\n║    1    ║    預言家     ║    7    ║       守衛      ║\n╠═══╬═══════╬═══╬═══════╣\n║    2   ║       女巫       ║   8    ║     守墓人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    3   ║       獵人       ║   9    ║     攝夢人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    4   ║       白痴       ║  10   ║     獵魔人    ║\n╠═══╬═══════╬═══╬═══════╣\n║    5   ║       騎士       ║   11   ║     魔術師    ║\n╠═══╬═══════╬═══╬═══════╣\n║    6   ║     通靈師    ║   12   ║  黑市商人  ║\n╚═══╩═══════╩═══╩═══════╝', 1, 1, len(goods))
+      if (goods[msg] in set_good):
+        await ctx.send(f'已經有{goods[msg]}！')
       else:
-        check_msg += goods[msg]
+        set_good.append(msg)
+        await ctx.send(f'加咗{goods[msg]}')
+        if (msg < 8):
+          check_msg += goods[msg][0]
+        else:
+          check_msg += goods[msg]
     check_msg += str(wgc[2]) + goods[0]
     for i in range(wgc[2]):
       set_good.append(0)
-    ans = await checkYorN(ctx, f'{check_msg}，確認？（y/n）')
+    ans = await getYorN(ctx, f'{check_msg}，確認？（y/n）')
+
+  # -------------------------- CONFIGURE THE GAME: SETTINGS --------------------------
+  police = await getYorN(ctx, '上唔上警？（y/n）')
+  speaktime = await getTimeInSeconds(ctx, '請輸入發言時間（mm:ss）')
+
+
 
   #   channel = client.get_channel(CHANNEL)
   #   command = message.content.strip()[len(BOT_PREFIX):].lower().split(' ')[0]
@@ -161,38 +183,111 @@ async def _start(ctx: commands.Context):
 async def _exit(ctx: commands.Context):
   ctx.send('中止遊戲！')
 
-async def checkYorN(ctx, q):
-  await ctx.send(q)
-  msg = await bot.wait_for('message')
-  if (msg.content.lower() in ('no', 'n', 'false', 'f', '0', 'disable', 'off', '唔係', '不', '不是', '否')):
-    return 0
-  elif (msg.content.lower() in ('yes', 'y', 'true', 't', '1', 'enable', 'on', '係', '是')):
-    return 1
+async def getYorN(ctx, q, delete=False, tts=False, delay=0, timeout=0):
+  msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
+  if (msg):
+    if (msg.content.lower() in ('no', 'n', 'false', 'f', '0', 'disable', 'off', '唔係', '不', '不是', '否')):
+      return False
+    elif (msg.content.lower() in ('yes', 'y', 'true', 't', '1', 'enable', 'on', '係', '是')):
+      return True
+    else:
+      await ctx.send('請回答y/n！')
+      return await getYorN(ctx, q)
   else:
-    await ctx.send('請回答y/n！')
-    return await checkYorN(ctx, q)
+    return msg
 
-async def checkNumber(ctx, q, x=float('inf'), min=float('-inf'), max=float('inf')):
+async def getNumber(ctx, q, x=float('inf'), min=0, max=100, delete=False, tts=False, delay=0, timeout=0):
   valid = True
-  await ctx.send(q)
-  msg = await bot.wait_for('message')
-  msg = re.findall(r'\d+', msg.content)
-  indexes = list(map(int, msg))
-  if (len(indexes) == x) and (x > 1):
-    for index in indexes:
-      if (index < min) or (index > max):
-        valid = False
-  elif (len(indexes) == x) and (x == 1):
-    indexes = indexes[0]
-    if (indexes < min) or (indexes > max):
+  msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
+  if (msg):
+    msg = re.findall(r'\d+', msg.content)
+    indexes = list(map(int, msg))
+    if (len(indexes) == x):
+      for index in indexes:
+        if (index not in range(min, max)):
+          valid = False
+      if (x == 1):
+        indexes = indexes[0]
+    else:
       valid = False
+    if (valid):
+      return indexes
+    else:
+      await ctx.send(f'請輸入啱嘅數字！（{min}-{max-1}）')
+      return await getNumber(ctx, q, x, min, max)
   else:
-    valid = False
+    return msg
 
-  if (valid):
-    return indexes
+async def getTimeInSeconds(ctx, q, delete=False, tts=False, delay=0, timeout=0):
+  msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
+  if (msg):
+    if (re.match(r'\d{1,2}:\d{2}', msg.content)):
+      msg = list(map(int, msg.content.split(':')))
+      time = msg[0] * 60 + msg[1]
+      return time
+    else:
+      await ctx.send('請輸入正確格式！（mm:ss）')
+      return await getTimeInSeconds(ctx, q)
   else:
-    await ctx.send(f'請輸入啱嘅數字！（{min}-{max}）')
-    return await checkNumber(ctx, q, x, min, max)
+    return msg
+
+async def getMember(ctx, q, delete=False, number=1, tts=False, delay=0, timeout=0):
+  msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
+  if (msg):
+    if (number == 1):
+      if (delete):
+        await getMessage(ctx, '收到！', False, False, 0, False)
+      return msg.author
+    else:
+      authors = []
+      authors.append(msg.author)
+      await getMessage(ctx, f'收到！-{number-len(authors)}', False, False, 0, False)
+      while (len(authors) != number):
+        msg = await getMessage(ctx, '', delete, tts, delay)
+        # if (msg.author not in authors):
+        authors.append(msg.author)
+        await getMessage(ctx, f'收到！-{number-len(authors)}', False, False, 0, False)
+      return authors
+  else:
+    return msg
+
+# async def findPlayerByNumber(players, number):
+
+
+async def setRole(ctx, role, players, x=1):
+  authors = await getMember(ctx, f'{role}請輸入任何字元確認身份', True, x, False, 0, 15)
+  if (x == 1):
+    for player in players:
+      if (player.member == authors):
+        player.role = role
+  else:
+    for author in authors:
+      for player in players:
+        if (player.member == author):
+          player.role = role
+  return players
+
+async def getMessage(ctx, q, delete=False, tts=False, delay=0, get=True, timeout=0):
+  if (q):
+    bmsg = await ctx.send(q, tts=tts)
+    await asyncio.sleep(delay)
+  if (get):
+    if (timeout):
+      try:
+        msg = await bot.wait_for('message', timeout=timeout)
+      except asyncio.TimeoutError:
+        if (delete and q):
+          await bmsg.delete()
+        return None
+    else:
+      msg = await bot.wait_for('message')
+    if (msg.author.bot == True):
+      msg = await getMessage(ctx, '', delete, tts, delay, get)
+    if (delete):
+      if (q):
+        await bmsg.delete()
+      await msg.delete()
+    return msg
+  return
 
 bot.run(TOKEN)
