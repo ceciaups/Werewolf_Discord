@@ -65,49 +65,7 @@ async def _test(ctx: commands.Context):
     members.pop(index)
   
   # test function
-  players = []
-  for i in range(3):
-    for member in members:
-      player = Player(member, '')
-      players.append(player)
-  for i in range(2):
-    members.append(members[0])
-    members.append(members[1])
-    members.append(members[2])
-    members.append(members[3])
-  set_all = set_wolf + set_good
 
-  while (0 not in wgc):
-    day += 1
-    kill = 0
-    # night phase
-    ans = False
-    print(f'{day}')
-    if (day == 1):
-      msg1 = '請確認身份'
-    else:
-      msg1 = ''
-      
-    # 魔術師 
-    # 狼兄狼弟
-    # if ('狼兄' in set_wolf):
-    #   if (day == 1):
-    #     await getMessage(ctx, f'狼兄狼弟請開眼，{msg1}', False, True, 0, False)
-    #     players = await setRole(ctx, '狼兄', players)
-    #     players = await setRole(ctx, '狼弟', players)
-    #     await getMessage(ctx, f'狼兄狼弟請閉眼', False, True, 0, False)
-    #   else:
-    #     await getMessage(ctx, f'狼弟請開眼，請選擇你要復仇嘅對象', False, True, 0, False)
-    # 女巫
-    # if ((goods[2]) in set_good):
-      
-    #   await getMessage(ctx, f'{goods[2]}請開眼，{msg1}', False, True, 0, False)
-    #   author = await getMember(ctx, f'{goods[2]}請輸入任何字元確認身份', True)
-    #   player = await findPlayerByMember(players, author)
-    #   player.role = goods[2]
-
-    for player in players:
-      print(f'{player.member}, {player.member.nick}, {player.role}')
   pass
 
 @bot.command(name='start')
@@ -146,7 +104,7 @@ async def _start(ctx: commands.Context):
       await ctx.send('請各位玩家依序回應')
       for i in range(1, len(members)+1):
         index = await getMember(ctx, f'{i}號玩家')
-        index = members.index(index)
+        index = members.index(index[0])
         await members[index].edit(nick=i)
   else:
     await ctx.send('唔夠玩家！')
@@ -220,6 +178,7 @@ async def _start(ctx: commands.Context):
   await getMessage(ctx, '準備好請派牌！（輸入任何字元繼續遊戲)')
   await getMessage(ctx, '倒數三聲後可以確認身份，三，二，一', False, True, 15, False)
   while (0 not in wgc):
+    await getMessage(ctx, '天黑請閉眼', False, True, 5, False)
     day += 1
     # night phase
     if (day == 1):
@@ -235,7 +194,8 @@ async def _start(ctx: commands.Context):
           timeout = 15
         else:
           timeout = 30
-        shield = await getNumber(ctx, '守衛請開眼，請選擇守護嘅對象', 1, 0, len(members)+1, True, True, 0, timeout)
+        await getMessage(ctx, '守衛請開眼，請選擇守護嘅對象', False, True, 0, False)
+        shield = await getNumber(ctx, '', 1, 0, len(members)+1, True, True, 0, timeout)
         if (shield):
           index = await findPlayerByNumber(players, shield)
           if (players[index].alive):
@@ -309,42 +269,54 @@ async def getYorN(ctx, q, delete=False, tts=False, delay=0, timeout=0, member=Fa
   if (msg):
     if (msg.content.lower() in ('no', 'n', 'false', 'f', '0', 'disable', 'off', '唔係', '不', '不是', '否')):
       if (member):
-        return False, msg.author.nick
+        ans = [False, msg.author.nick]
       else:
-        return False
+        ans = False
     elif (msg.content.lower() in ('yes', 'y', 'true', 't', '1', 'enable', 'on', '係', '是')):
       if (member):
-        return True, msg.author.nick
+        ans = [True, msg.author.nick]
       else:
-        return True
+        ans = True
     else:
-      await ctx.send('請回答y/n！')
-      return await getYorN(ctx, q)
+      if (delete) and (msg):
+        await msg.delete()
+      bmsg = await ctx.send('請回答y/n！')
+      ans = await getYorN(ctx, q, delete, tts, delay, timeout, member)
+      if (delete) and (bmsg):
+        await bmsg.delete()
+      return ans
+    if (delete) and (msg):
+      await msg.delete()
+    return ans
   else:
     return msg
 
-async def getNumber(ctx, q, x=float('inf'), min=0, max=100, delete=False, tts=False, delay=0, timeout=0):
+async def getNumber(ctx, q, x=1, min=0, max=100, delete=False, tts=False, delay=0, timeout=0):
   valid = True
   msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
   if (msg):
-    msg = re.findall(r'\d+', msg.content)
-    indexes = list(map(int, msg))
-    if (len(indexes) == x):
-      for index in indexes:
+    ans = re.findall(r'\d+', msg.content)
+    ans = list(map(int, ans))
+    if (len(ans) == x):
+      for index in ans:
         if (index not in range(min, max)):
           valid = False
       if (x == 1):
-        indexes = indexes[0]
+        ans = ans[0]
     else:
       valid = False
     if (valid):
-      return indexes
+      if (delete) and (msg):
+        await msg.delete()
+      return ans
     else:
+      if (delete) and (msg):
+        await msg.delete()
       bmsg = await ctx.send(f'請輸入啱嘅數字！（{min}-{max-1}）')
-      indexes = await getNumber(ctx, q, x, min, max, delete, tts, delay, timeout)
-      if (delete):
-        bmsg.delete()
-      return indexes
+      ans = await getNumber(ctx, q, x, min, max, delete, tts, delay, timeout)
+      if (delete) and (msg):
+        await bmsg.delete()
+      return ans
   else:
     return msg
 
@@ -361,23 +333,18 @@ async def getTimeInSeconds(ctx, q, delete=False, tts=False, delay=0, timeout=0):
   else:
     return msg
 
-async def getMember(ctx, q, delete=False, number=1, tts=False, delay=0, timeout=0):
+async def getMember(ctx, q, delete=False, number=1, tts=False, delay=0, timeout=0, ans=[]):
   msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
   if (msg):
+    ans.append(msg.author)
+    if (delete) and (msg):
+      await msg.delete()
     if (number == 1):
-      if (delete):
-        await getMessage(ctx, '收到！', False, False, 0, False)
-      return msg.author
+      await getMessage(ctx, '收到！', False, False, 0, False)
     else:
-      authors = []
-      authors.append(msg.author)
-      await getMessage(ctx, f'收到！-{number-len(authors)}', False, False, 0, False)
-      while (len(authors) != number):
-        msg = await getMessage(ctx, '', delete, tts, delay)
-        # if (msg.author not in authors):
-        authors.append(msg.author)
-        await getMessage(ctx, f'收到！-{number-len(authors)}', False, False, 0, False)
-      return authors
+      await getMessage(ctx, f'收到！-{number-1}', False, False, 0, False)
+      ans = await getMember(ctx, '', delete, number-1, tts, delay, timeout, ans)
+    return ans
   else:
     return msg
 
@@ -391,15 +358,10 @@ async def findPlayerByNumber(players, number):
 async def setRole(ctx, role, players, x=1):
   authors = await getMember(ctx, f'{role}請輸入任何字元確認身份', True, x, False, 0, 15)
   if (authors):
-    if (x == 1):
+    for author in authors:
       for player in players:
-        if (player.member == authors):
+        if (player.member == author):
           player.role = role
-    else:
-      for author in authors:
-        for player in players:
-          if (player.member == author):
-            player.role = role
   return players
 
 async def getMessage(ctx, q, delete=False, tts=False, delay=0, get=True, timeout=0):
@@ -421,9 +383,6 @@ async def getMessage(ctx, q, delete=False, tts=False, delay=0, get=True, timeout
   if (delete):
     if (q):
       await bmsg.delete()
-    if (get):
-      await msg.delete()
-      print(f'delete')
   if (get):
     return msg
   else:
