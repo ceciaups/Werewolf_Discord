@@ -65,7 +65,7 @@ async def _test(ctx: commands.Context):
     members.pop(index)
   
   # test function
-
+ 
   pass
 
 @bot.command(name='start')
@@ -226,7 +226,7 @@ async def _start(ctx: commands.Context):
         else:
           index = i
           break
-      if (not msg):
+      if (set_wolf[0] not in [0, 4, 5, 10, 11]) and (not msg):
         continue
       msg = await setRole(ctx, wolves[0], players, len(set_wolf)-index)
       if (msg):
@@ -336,6 +336,10 @@ async def getTimeInSeconds(ctx, q, delete=False, tts=False, delay=0, timeout=0):
 async def getMember(ctx, q, delete=False, number=1, tts=False, delay=0, timeout=0, ans=[]):
   msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
   if (msg):
+    if (msg.author in ans):
+      if (delete) and (msg):
+        await msg.delete()
+      return await getMember(ctx, '', delete, number, tts, delay, timeout, ans)
     ans.append(msg.author)
     if (delete) and (msg):
       await msg.delete()
@@ -376,7 +380,7 @@ async def getMessage(ctx, q, delete=False, tts=False, delay=0, get=True, timeout
         if (delete and q):
           await bmsg.delete()
         return None
-    else:
+    else: 
       msg = await bot.wait_for('message')
     if (msg.author.bot == True):
       msg = await getMessage(ctx, '', delete, tts, delay, get, timeout)
