@@ -19,54 +19,17 @@ intents.members = True
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Class
-# class Settings:
-#   def __init__(self, config, number, players):
-#     self.config = config
-#     self.number = number
-#     self.players = players
-
 class Player():
   def __init__(self, member, role, alive=True):
     self.member = member
     self.role = role
     self.alive = alive
 
-# global settings variables
-# roles = ""
-# settings = Settings([], 0, [])
-
 @bot.event
 async def on_ready():
-  # for guild in client.guilds:
-  #       if guild.name == GUILD:
-  #           break
   print(
     f'{bot.user} has connected to Discord!\n'
   )
-
-@bot.command(name='test')
-async def _test(ctx: commands.Context):
-  members = ctx.channel.members
-  indexes = []
-  wgc = [4,4,4]
-  set_wolf = [1,0,0,0]
-  wolves = ['小狼', '白狼王', '黑狼王', '狼美人', '機械狼', '石像鬼', '夢魘', '血月使徒', '惡靈騎士', '隱狼/雪狼', '狼兄', '狼弟']
-  set_good = [1,2,3,7,0,0,0,0]
-  goods = ['平民', '預言家', '女巫', '獵人', '白痴', '騎士', '通靈師', '守衛', '守墓人', '攝夢人', '獵魔人', '魔術師', '黑市商人']
-  set_all = []
-  police = False
-  speaktime = 0
-  day = 0
-  for i, member in enumerate(members):
-    if ((member.bot == True) or (member.id == ADMIN_ID)):
-      indexes.append(i)
-  for index in reversed(indexes):
-    members.pop(index)
-  
-  # test function
- 
-  pass
 
 @bot.command(name='start')
 async def _start(ctx: commands.Context):
@@ -81,6 +44,11 @@ async def _start(ctx: commands.Context):
   police = False
   speaktime = 0
   day = 0
+  shield = 0
+  broken = False
+  magic = []
+  magic_history = []
+  witcher = [False, False]
 
   # -------------------------- CONFIGURE THE GAME: PLAYERS --------------------------
   members = ctx.channel.members
@@ -179,109 +147,286 @@ async def _start(ctx: commands.Context):
   await getMessage(ctx, '倒數三聲後可以確認身份，三，二，一', False, True, 15, False)
   while (0 not in wgc):
     await getMessage(ctx, '天黑請閉眼', False, True, 5, False)
+    kill = [0]
+    wolf_kill = 1
+    shield = 0
+    broken = False
+    magic = []
     day += 1
+
     # night phase
     if (day == 1):
+      timeout = 15
       msg1 = '請確認身份'
     else:
+      timeout = 30
       msg1 = ''
     # 守衛
-    if (7 in set_good):
+    role_number = 7
+    if (role_number in set_good):
       msg = None
-      shield = 0
-      while (not msg) or (not msg[0]):
+      while (day == 1) and (not msg):
+        await getMessage(ctx, f'{goods[role_number]}請睜眼，{msg1}', False, True, 0, False)
+        msg = await setRole(ctx, goods[role_number], players)
+        if (msg):
+          players = msg
+      msg = None
+      while (not msg):
         if (day == 1):
-          timeout = 15
+          await getMessage(ctx, f'請選擇守護嘅對象', False, True, 0, False)
         else:
-          timeout = 30
-        await getMessage(ctx, '守衛請開眼，請選擇守護嘅對象', False, True, 0, False)
-        shield = await getNumber(ctx, '', 1, 0, len(members)+1, True, True, 0, timeout)
-        if (shield):
-          index = await findPlayerByNumber(players, shield)
-          if (players[index].alive):
-            msg = await getYorN(ctx, f'{shield}號，確認？（y/n）', True, False, 0, 0, True)
-          else:
-            await getMessage(ctx, '請輸入存活嘅玩家', True, False, 5, False)
+          await getMessage(ctx, f'{goods[role_number]}請睜眼，請選擇守護嘅對象', False, True, 0, False)
+        msg = await getNumber(ctx, '', 1, 0, len(members)+1, True, False, 0, timeout)
+        if (msg != None):
+          if (msg) and (msg != shield):
+            shield = msg
+            index = await findPlayerByNumber(players, shield)
+            if (players[index].alive):
+              msg = await getYorN(ctx, f'{shield}號，確認？（y/n）', True, False, 0, 0)
+            else:
+              await getMessage(ctx, '請輸入存活嘅玩家！', True, False, 5, False)
+              msg = None
+          elif (msg) and (msg == shield):
+            await getMessage(ctx, '唔可以連續兩日守同一位玩家！', True, False, 5, False)
             msg = None
-        elif (shield == 0):
-          index = 0
-          msg = await getYorN(ctx, f'空守，確認？（y/n）', True, False, 0, 0, True)
+          elif (msg == 0):
+            msg = await getYorN(ctx, f'空守，確認？（y/n）', True, False, 0, 0)
+      await getMessage(ctx, f'{goods[role_number]}請閉眼', False, True, 5, False)
+    # 魔術師
+    role_number = 11
+    if (role_number in set_good):
+      msg = None
+      while (day == 1) and (not msg):
+        await getMessage(ctx, f'{goods[role_number]}請睜眼，{msg1}', False, True, 0, False)
+        msg = await setRole(ctx, goods[role_number], players)
+        if (msg):
+          players = msg
+      msg = None
+      while (not msg):
+        if (day == 1):
+          await getMessage(ctx, f'請選擇交換嘅對象', False, True, 0, False)
         else:
-          msg = None
+          await getMessage(ctx, f'{goods[role_number]}請睜眼，請選擇交換嘅對象', False, True, 0, False)
+        if (len(players) - len(magic_history) >= 2):
+          msg = await getNumber(ctx, '', 2, 0, len(members)+1, True, False, 0, timeout)
+          if (msg != None):
+            if (len(msg) == 1):
+              msg = await getYorN(ctx, f'空換，確認？（y/n）', True, False, 0, 0)
+            elif (msg[0] not in magic_history) and (msg[1] not in magic_history):
+              magic = msg
+              msg = await getYorN(ctx, f'{magic[0]}號同{magic[1]}號，確認？（y/n）', True, False, 0, 0)
+            else:
+              await getMessage(ctx, f'唔可以換已經死咗/交換過嘅玩家！{magic_history}', True, False, 5, False)
+              msg = None
+        else:
+          await getMessage(ctx, f'無足夠嘅玩家交換，自動空守！{magic_history}', True, False, 5, False)
+          magic = []
+          msg = True
+      magic_history.extend(magic)
+      magic_history.sort()
+      await getMessage(ctx, f'{goods[role_number]}請閉眼', False, True, 5, False)
+    # 狼兄狼弟
+    role_number = 10
+    if (role_number in set_wolf):
       if (day == 1):
-        index = await findPlayerByNumber(players, int(msg[1]))
-        players[index].role = goods[7]
-    await getMessage(ctx, f'守衛請閉眼', False, True, 5, False)
+        msg = None
+        while (not msg):
+          await getMessage(ctx, f'{wolves[role_number]}{wolves[role_number+1]}請睜眼，{msg1}', False, True, 0, False)
+          msg = await setRole(ctx, wolves[role_number], players)
+          if (msg):
+            players = msg
+            msg = await setRole(ctx, wolves[role_number+1], players)
+            if (msg):
+              players = msg
+        await getMessage(ctx, f'{wolves[role_number]}{wolves[role_number+1]}請閉眼', False, True, 5, False)
+      else:
+        msg = None
+        while (not msg):
+          await getMessage(ctx, f'{wolves[role_number+1]}請睜眼，請選擇你要復仇嘅對象。', False, True, 0, False)
+          index1 = await findPlayerByRole(players, wolves[role_number])
+          index2 = await findPlayerByRole(players, wolves[role_number+1])
+          if (players[index2].alive):
+            if (players[index1].alive):
+              await getMessage(ctx, f'{wolves[role_number]}仲未出局，未有復仇刀！', True, False, 10, False)
+              msg = True
+            else:
+              msg = await getNumber(ctx, '', 1, 1, len(members)+1, True, False, 0, timeout)
+              if (msg):
+                index = await findPlayerByNumber(players, msg)
+                if (players[index].alive):
+                  msg = await getYorN(ctx, f'{msg}號，確認？（y/n）', True)
+                  if (msg):
+                    kill.append(int(players[index].member.nick))
+                    wolf_kill += 1
+                else:
+                  await getMessage(ctx, '請輸入存活嘅玩家！', True, False, 5, False)
+                  msg = None
+          else:
+            await getMessage(ctx, f'{wolves[role_number+1]}已出局！', True, False, 10, False)
+            msg = True
+        await getMessage(ctx, f'{wolves[role_number+1]}請閉眼', False, True, 5, False)
     # 狼人
     msg = None
     while (day == 1) and (not msg):
-      await getMessage(ctx, f'狼人請開眼，{msg1}', False, True, 0, False)
+      await getMessage(ctx, f'狼人請睜眼，{msg1}', False, True, 0, False)
       for i, wolf in enumerate(set_wolf):
         if (wolf not in [0, 4, 5, 10, 11]):
           msg = await setRole(ctx, wolves[wolf], players)
           if (msg):
             players = msg
-          else:
-            break
         else:
+          msg = True
           index = i
-          break
-      if (set_wolf[0] not in [0, 4, 5, 10, 11]) and (not msg):
-        continue
-      msg = await setRole(ctx, wolves[0], players, len(set_wolf)-index)
-      if (msg):
-        players = msg
+          if (wolf == 0):
+            break
+      if (msg) and (0 in set_wolf):
+          msg = await setRole(ctx, wolves[0], players, len(set_wolf)-index)
+          if (msg):
+            players = msg
     msg = None
     while (not msg):
       if (day == 1):
         msg = await getNumber(ctx, '狼人請殺人', 1, 0, len(members)+1, True, True)
       else:
-        msg = await getNumber(ctx, '狼人請開眼，狼人請殺人', 1, 0, len(members)+1, True, True)
+        msg = await getNumber(ctx, '狼人請睜眼，狼人請殺人', 1, 0, len(members)+1, True, True)
       if (msg):
-        index = await findPlayerByNumber(players, msg)
+        kill[0] = msg
+        index = await findPlayerByNumber(players, kill[0])
         if (players[index].alive):
-          msg = await getYorN(ctx, f'{msg}號，確認？（y/n）', True)
-          if (msg):
-            players[index].alive = False
-            if (players[index].role in goods):
-              if (players[index].role != goods[0]):
-                wgc[1] -= 1
-              else:
-                wgc[2] -= 1
-            elif (players[index].role in wolves):
-              wgc[0] -= 1
+          msg = await getYorN(ctx, f'{kill[0]}號，確認？（y/n）', True)
         else:
           await getMessage(ctx, '請輸入存活嘅玩家', True, False, 5, False)
           msg = None
       elif (msg == 0):
-        msg = await getYorN(ctx, f'空刀，確認？（y/n）', True)
-
-  #   channel = client.get_channel(CHANNEL)
-  #   command = message.content.strip()[len(BOT_PREFIX):].lower().split(' ')[0]
-  #   parameters = message.content.strip().lower().split(' ')[1:]
+        msg = await getYorN(ctx, '空刀，確認？（y/n）', True)
+    await getMessage(ctx, '狼人請閉眼', False, True, 5, False)
+    # 女巫
+    if (2 in set_good):
+      msg = None
+      while (day == 1) and (not msg):
+        await getMessage(ctx, f'{goods[2]}請睜眼，{msg1}', False, True, 0, False)
+        msg = await setRole(ctx, goods[2], players)
+        if (msg):
+          players = msg
+      msg = None
+      index = await findPlayerByRole(players, goods[2])
+      while (not msg):
+        msg = False
+        if (day == 1):
+          await getMessage(ctx, '請問你要唔要用救藥？', False, True, 0, False)
+        else:
+          await getMessage(ctx, f'{goods[2]}請睜眼，請問你要唔要用救藥？', False, True, 0, False)
+        if (not witcher[0]) and (kill[0] != int(players[index].member.nick)) and (players[index].alive):
+          msg = await getYorN(ctx, f'{kill[0]}號死咗，要唔要救？（y/n）', True, False, 0, timeout)
+        if (msg):
+          msg = await getYorN(ctx, f'救{kill[0]}號，確認？（y/n）', True)
+          if (msg):
+            witcher[0] = True
+            if (kill[0] != shield):
+              kill.pop(0)
+              wolf_kill -= 1
+            else:
+              broken = True
+            await getMessage(ctx, '請問你要唔要用毒藥？', False, True, 0, False)
+            await getMessage(ctx, '你用咗救藥，無得用毒藥！', True, False, 5, False)
+        elif (msg != None):
+          if (players[index].alive):
+            if (not witcher[0]) and (kill[0] == int(players[index].member.nick)):
+              await getMessage(ctx, '你中咗刀，不能自救！', True, False, 8, False)
+            elif (not witcher[0]):
+              await getMessage(ctx, '唔用救藥！', True, False, 8, False)
+            else:
+              await getMessage(ctx, '救藥已經用咗！', True, False, 8, False)
+          else:
+             await getMessage(ctx, f'{goods[2]}已出局！', True, False, 8, False)
+          await getMessage(ctx, '請問你要唔要用毒藥？', False, True, 0, False)
+          if (not witcher[1]) and (players[index].alive):
+            msg = await getNumber(ctx, f'唔毒請輸入0，毒請輸入1-{len(members)}', 1, 0, len(members)+1, True, False, 0, timeout)
+            if (msg):
+              index = await findPlayerByNumber(players, msg)
+              if (players[index].alive):
+                msg = await getYorN(ctx, f'{msg}號，確認？（y/n）', True)
+                if (msg):
+                  witcher[1] = True
+                  kill.append(int(players[index].member.nick))
+              else:
+                await getMessage(ctx, '請輸入存活嘅玩家', True, False, 5, False)
+                msg = None
+            elif (msg != None):
+              msg = await getYorN(ctx, f'唔用毒藥，確認？（y/n）', True)
+          elif (players[index].alive):
+            await getMessage(ctx, '毒藥已經用咗！', True, False, 10, False)
+            msg = True
+          else:
+            await getMessage(ctx, f'{goods[2]}已出局！', True, False, 10, False)
+            msg = True
+      await getMessage(ctx, f'{goods[2]}請閉眼', False, True, 5, False)
+    # 平民
+    for player in players:
+      if (not player.role):
+        player.role = goods[0]
+    # 夜刀
+    for x, dead in enumerate(reversed(kill)):
+      if (dead):
+        valid = True
+        if ((len(kill)-x) <= wolf_kill):
+          if (shield == dead) and (not broken):
+            valid = False
+        if (valid):
+          if (dead in magic):
+            kill.pop(len(kill)-x-1)
+            if (dead == magic[0]):
+              kill.insert(len(kill)-x-1, magic[1])
+              dead = magic[1]
+            else:
+              kill.insert(len(kill)-x-1, magic[0])
+              dead = magic[0]
+          index = await findPlayerByNumber(players, dead)
+          players[index].alive = False
+          if (int(players[index].member.nick) not in magic_history):
+            magic_history.append(int(players[index].member.nick))
+            magic_history.sort()
+          if (players[index].role in goods):
+            if (players[index].role != goods[0]):
+              wgc[1] -= 1
+            else:
+              wgc[2] -= 1
+          elif (players[index].role in wolves):
+            wgc[0] -= 1
+        else:
+          kill.pop(len(kill)-x-1)
+    # 天光公報死訴
+    if (len(kill) == 0):
+      await getMessage(ctx, f'天亮請睜眼，昨晚是平安夜！', False, True, 5, False)
+    else:
+      msg = '天亮請睜眼，昨晚'
+      for x, i in enumerate(kill):
+        msg += str(i)
+        msg += '號'
+        if (x != len(kill)-1):
+          msg += '、'
+      msg += '被殺死！'
+      await getMessage(ctx, f'{msg}', False, True, 5, False)
+    # checking state
+    for player in players:
+      print(f'{player.member}, {player.member.nick}, {player.role}, {player.alive}')
 
 @bot.command(name='exit')
 async def _exit(ctx: commands.Context):
   ctx.send('中止遊戲！')
 
-async def getYorN(ctx, q, delete=False, tts=False, delay=0, timeout=0, member=False):
+async def getYorN(ctx, q, delete=False, tts=False, delay=0, timeout=0):
   msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
   if (msg):
     if (msg.content.lower() in ('no', 'n', 'false', 'f', '0', 'disable', 'off', '唔係', '不', '不是', '否')):
-      if (member):
-        ans = [False, msg.author.nick]
-      else:
-        ans = False
+      ans = False
     elif (msg.content.lower() in ('yes', 'y', 'true', 't', '1', 'enable', 'on', '係', '是')):
-      if (member):
-        ans = [True, msg.author.nick]
-      else:
-        ans = True
+      ans = True
     else:
       if (delete) and (msg):
         await msg.delete()
       bmsg = await ctx.send('請回答y/n！')
-      ans = await getYorN(ctx, q, delete, tts, delay, timeout, member)
+      ans = await getYorN(ctx, q, delete, tts, delay, timeout)
       if (delete) and (bmsg):
         await bmsg.delete()
       return ans
@@ -297,7 +442,7 @@ async def getNumber(ctx, q, x=1, min=0, max=100, delete=False, tts=False, delay=
   if (msg):
     ans = re.findall(r'\d+', msg.content)
     ans = list(map(int, ans))
-    if (len(ans) == x):
+    if (len(ans) == x) or ((len(ans) == 1) and (not ans[0])):
       for index in ans:
         if (index not in range(min, max)):
           valid = False
@@ -354,19 +499,26 @@ async def getMember(ctx, q, delete=False, number=1, tts=False, delay=0, timeout=
 
 async def findPlayerByNumber(players, number):
   for x, player in enumerate(players):
-    if (int(player.member.nick) == number):
+    if (int(player.member.nick) == int(number)):
       return x
   return None
 
+async def findPlayerByRole(players, role):
+  for x, player in enumerate(players):
+    if (player.role == role):
+      return x
+  return None
 
 async def setRole(ctx, role, players, x=1):
-  authors = await getMember(ctx, f'{role}請輸入任何字元確認身份', True, x, False, 0, 15)
+  authors = await getMember(ctx, f'{role}請輸入任何字元確認身份', True, x, False, 0, 15, [])
   if (authors):
     for author in authors:
       for player in players:
         if (player.member == author):
           player.role = role
-  return players
+    return players
+  else:
+    return authors
 
 async def getMessage(ctx, q, delete=False, tts=False, delay=0, get=True, timeout=0):
   if (q):
