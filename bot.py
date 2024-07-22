@@ -33,6 +33,12 @@ async def on_ready():
     f'{bot.user} has connected to Discord!\n'
   )
 
+# test function
+@bot.command(name='test')
+async def _test(ctx: commands.Context):
+  
+  pass
+
 @bot.command(name='start')
 async def _start(ctx: commands.Context):
   # await ctx.send('** \'!exit\'可以隨時離開遊戲！ **')
@@ -43,7 +49,7 @@ async def _start(ctx: commands.Context):
   wolves = ['小狼', '白狼王', '黑狼王', '狼美人', '機械狼', '石像鬼', '夢魘', '血月使徒', '惡靈騎士', '隱狼/雪狼', '狼兄', '狼弟']
   set_good = []
   goods = ['平民', '預言家', '女巫', '獵人', '白痴', '騎士', '通靈師', '守衛', '守墓人', '攝夢人', '獵魔人', '魔術師', '黑市商人']
-  police = False
+  sheriff = False
   speaktime = 0
   day = 0
   shield = 0
@@ -53,6 +59,7 @@ async def _start(ctx: commands.Context):
   magic_history = []
   witcher = [0, 0]
   add = []
+  kill_old = []
 
   # -------------------------- CONFIGURE THE GAME: PLAYERS --------------------------
   members = ctx.channel.members
@@ -139,7 +146,7 @@ async def _start(ctx: commands.Context):
     ans = await getYorN(ctx, f'{check_msg}，確認？（y/n）')
 
   # -------------------------- CONFIGURE THE GAME: SETTINGS --------------------------
-  # police = await getYorN(ctx, '上不上警？（y/n）')
+  # sheriff = await getYorN(ctx, '上不上警？（y/n）')
   # speaktime = await getTimeInSeconds(ctx, '請輸入發言時間（mm:ss）')
 
   # ---------------------------------- STARTING THE GAME ----------------------------
@@ -147,18 +154,23 @@ async def _start(ctx: commands.Context):
   for member in members:
     player = Player(member, '')
     players.append(player)
+  if (wgc[0] > 3):
+    no_sheriff = [2, False]
+  else:
+    no_sheriff = [1, False]
   await getMessage(ctx, '準備好請派牌！（輸入任何字元繼續遊戲)')
   await getMessage(ctx, '倒數三聲後可以確認身份，三，二，一', False, True, 15, False)
   while (0 not in wgc):
     await getMessage(ctx, '天黑請閉眼', False, True, 5, False)
     wolf_kill = 1
-    kill = []
+    kill = [0]
     super_kill = []
     magic = []
     sleep[1] = False
     broken = False
     double = False
     day += 1
+    no_sheriff[1] = False
 
     # night phase
     if (day == 1):
@@ -511,28 +523,6 @@ async def _start(ctx: commands.Context):
       for player in players:
         if (not player.role):
           player.role = goods[0]
-    # 上警發言
-    if (day == 1) and (police):
-      await getMessage(ctx, f'要上警的玩家請舉手！', False, True, 5, False)
-      await getMessage(ctx, f'天亮請睜眼！', False, True, 0, False)
-      temp = await getNumber(ctx, '請問有幾多位玩家上警？', 1, 1, len(members)+1)
-      if (temp > 1):
-        number = random.randint(1,len(members))
-        direction = random.randint(0,1)
-        msg = f'{number}號，'
-        if (direction):
-          msg += '逆向開始發言'
-        else:
-          msg += '順向開始發言'
-        await getMessage(ctx, f'{msg}', False, True, 5, False)
-        for i in range(temp):
-          add = await listenSpeech(ctx, False, speaktime, add)
-        await getMessage(ctx, '仍然在警上的玩家請舉手！', False, True, 5, False)
-        await getMessage(ctx, '請用投票功能/自行選出警長！', False, False, 10, False)
-      else:
-        await getMessage(ctx, '直接當選警長！', False, True, 5, False)
-      police = await getNumber(ctx, f'請輸入當選警長的玩家！', 1, 1, len(members)+1)
-      await getMessage(ctx, f'{police}號當選警長！', False, True, 5, False)
     # 夜刀
     count = 0
     if (wolf_kill > 1):
@@ -585,15 +575,90 @@ async def _start(ctx: commands.Context):
             wgc[0] -= 1
         else:
           kill.pop(len(kill)-x-1-count)
+    kill.extend(kill_old)
     kill = list(dict.fromkeys(kill))
     kill.sort()
+    # 上警發言
+    if (day == 1) and (sheriff):
+      await getMessage(ctx, f'要上警的玩家請舉手！', False, True, 5, False)
+      await getMessage(ctx, f'天亮請睜眼！', False, True, 0, False)
+      temp_sheriff = await getNumber(ctx, '請問有幾多位玩家上警？', 1, 1, len(members)+1)
+      if (temp_sheriff > 1):
+        number = random.randint(1,len(members))
+        direction = random.randint(1,2)
+        msg = f'{number}號，'
+        if (direction == 1):
+          msg += '逆向開始發言'
+        else:
+          msg += '順向開始發言'
+        await getMessage(ctx, f'{msg}', False, True, 0, False)
+        await getMessage(ctx, '加時輸入\'+\'，自爆輸入\'0\'，騎士撞輸入\'h\'，跳過發言輸入任何字元', False, False, 3, False)
+        for i in range(temp_sheriff):
+          add = await listenSpeech(ctx, False, speaktime, add)
+          if (add[1] == 'hit'):
+            add = add[0]
+          elif (add[1] == 'explode'):
+            index = await findPlayerByNumber(players, add[2])
+            players[index].alive = False
+            if (players[index].role in goods):
+              if (players[index].role != goods[0]):
+                wgc[1] -= 1
+              else:
+                wgc[2] -= 1
+            elif (players[index].role in wolves):
+              wgc[0] -= 1
+            no_sheriff[0] -= 1
+            no_sheriff[1] = True
+            kill_old = kill
+            if (not no_sheriff[0]):
+              await getMessage(ctx, f'今場將沒有警徽！', False, True, 3, False)
+            break
+          else:
+            add = add[0]
+          if (i + 1 != temp_sheriff):
+            await getMessage(ctx, '下一位開始發言', True, False, 3, False)
+      else:
+        await getMessage(ctx, '直接當選警長！', False, True, 5, False)
+    if (sheriff == True) and (no_sheriff[0]) and (not no_sheriff[1]):
+      msg = None
+      if (temp_sheriff > 1):
+        msg = await getMessage(ctx, '仍然在警上的玩家請舉手！', False, True, 0, True, 5)
+        if (not msg):
+          msg = await getMessage(ctx, '請用投票功能/自行選出警長！', False, False, 0, True, 5)
+      if (msg):
+        msg = [msg.content.lower(), int(msg.author.nick)]
+      else:
+        msg = [msg, msg]
+      if (not msg[0]):
+        msg = await getNumber(ctx, f'請輸入當選警長的玩家！', 1, 0, len(members)+1, True, False, 0, 0, True)
+      if (msg[0] in (0, '0', 'e', 'explode', '爆', '自爆')):
+        await getMessage(ctx, f'{msg[1]}號自爆！', False, True, 3, False)
+        index = await findPlayerByNumber(players, msg[1])
+        players[index].alive = False
+        if (players[index].role in goods):
+          if (players[index].role != goods[0]):
+            wgc[1] -= 1
+          else:
+            wgc[2] -= 1
+        elif (players[index].role in wolves):
+          wgc[0] -= 1
+        no_sheriff[0] -= 1
+        no_sheriff[1] = True
+        kill_old = kill
+        if (not no_sheriff[0]):
+          await getMessage(ctx, f'今場將沒有警徽！', False, True, 3, False)
+      else:
+        sheriff = msg[0]
+        await getMessage(ctx, f'{sheriff}號當選警長！', False, True, 5, False)
+    if (no_sheriff[1]):
+      continue
     # 天光公報死訴
-    if (len(kill) == 0) and ((day != 1) or (not police)):
+    if (len(kill) == 0) and ((day != 1) or (not sheriff)):
       await getMessage(ctx, f'天亮請睜眼，昨晚是平安夜！', False, True, 5, False)
     elif (len(kill) == 0):
       await getMessage(ctx, f'昨晚是平安夜！', False, True, 5, False)
     else:
-      if (day != 1) or (not police):
+      if (day != 1) or (not sheriff):
         msg = '天亮請睜眼，昨晚'
       else:
         msg = '昨晚'
@@ -604,6 +669,7 @@ async def _start(ctx: commands.Context):
           msg += '、'
       msg += '被殺死！'
       await getMessage(ctx, f'{msg}', False, True, 5, False)
+    kill_old = []
     # 夜槍
     msg = None
     temp_kill = []
@@ -652,17 +718,18 @@ async def _start(ctx: commands.Context):
       await getMessage(ctx, f'{msg}', False, True, 5, False)
     # 日頭發言
     number = random.randint(1,len(members))
-    direction = random.randint(0,1)
+    direction = random.randint(1,2)
     msg = f'{number}號，'
-    if (direction):
+    if (direction == 1):
       msg += '逆向開始發言'
     else:
       msg += '順向開始發言'
-    await getMessage(ctx, f'{msg}', False, True, 5, False)
+    await getMessage(ctx, f'{msg}', False, True, 0, False)
+    await getMessage(ctx, '加時輸入\'+\'，自爆輸入\'0\'，騎士撞輸入\'h\'，跳過發言輸入任何字元', False, False, 5, False)
     for i in range(sum(wgc)):
       add = await listenSpeech(ctx, False, speaktime, add)
     # 投票
-    if (police):
+    if (sheriff):
       await getMessage(ctx, '警長請歸票！', False, True, 5, False)
     await getMessage(ctx, '請用投票功能/自行投出放逐的玩家！', False, False, 10, False)
     temp_kill = await getNumber(ctx, f'請輸入放逐的玩家！', 1, 1, len(members)+1)
@@ -720,7 +787,7 @@ async def getLorR(ctx, q, delete=False, tts=False, delay=0, timeout=0):
   else:
     return msg
 
-async def getNumber(ctx, q, x=1, min=0, max=100, delete=False, tts=False, delay=0, timeout=0):
+async def getNumber(ctx, q, x=1, min=0, max=100, delete=False, tts=False, delay=0, timeout=0, member=False):
   valid = True
   msg = await getMessage(ctx, q, delete, tts, delay, True, timeout)
   if (msg):
@@ -734,6 +801,8 @@ async def getNumber(ctx, q, x=1, min=0, max=100, delete=False, tts=False, delay=
         ans = ans[0]
     else:
       valid = False
+    if (member):
+      ans = [ans, int(msg.author.nick)]
     if (valid):
       if (delete) and (msg):
         await msg.delete()
@@ -799,17 +868,29 @@ async def listenSpeech(ctx, tts=False, timeout=0, add=[]):
       after = datetime.now()
       time -= math.floor((after - before).total_seconds())
       if (msg):
-        if (msg.content.lower() in ('e', 'explore', '爆', '自爆')):
-          msg = await getYorN(ctx, '自爆，確認？（y/n）', True, False, 0, 0)
-          if (msg):
-            return [add, 'explore']
+        temp = int(msg.author.nick)
+        if (msg.content.lower() in ('0', 'e', 'explode', '爆', '自爆')):
+          await msg.delete()
+          await getMessage(ctx, f'{temp}號自爆！', False, True, 3, False)
+          # msg = await getYorN(ctx, '自爆，確認？（y/n）', True, False, 0, 0)
+          # if (msg):
+          return [add, 'explode', temp]
         elif (msg.content.lower() in ('+', 'add', '加', '加時')):
-          msg = await getYorN(ctx, '加時，確認？（y/n）', True, False, 0, 0, True)
-          if (msg[0]):
-            if (msg[1] not in add):
-              add.append(msg[1])
-              return await listenSpeech(ctx, tts, timeout, add)
+          # msg = await getYorN(ctx, '加時，確認？（y/n）', True, False, 0, 0, True)
+          # if (msg[0]):
+          await msg.delete()
+          if (temp not in add):
+            add.append(temp)
+            return await listenSpeech(ctx, tts, timeout+time, add)
+          else:
+            await getMessage(ctx, '已經加過，不能再加！', True, False, 5, False)
+        elif (msg.content.lower() in ('h', 'hit', '撞', '騎', '騎士')):
+          # msg = await getYorN(ctx, '騎士啟動技能，確認？（y/n）', True, False, 0, 0, True)
+          # if (msg):
+          await msg.delete()
+          return [add, 'hit']
         else:
+          await msg.delete()
           msg = await getYorN(ctx, '結束發言，確認？（y/n）', True, False, 0, 0)
           if (msg):
             return [add, 'done']
